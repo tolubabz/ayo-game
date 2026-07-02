@@ -1,8 +1,6 @@
 # Ayò — A Concurrent, Multi-Threaded Game Engine in Java
 
-A playable implementati
-
-on of **Ayò** (a two-row, mancala-family seed-sowing game) built as an exercise in **concurrent programming**. Each player runs on its own thread, turns are arbitrated with a lock and a condition variable, and all shared state is guarded so that two threads can never corrupt the board mid-move.
+A playable implementation of **Ayò** (a two-row, mancala-family seed-sowing game) built as an exercise in **concurrent programming**. Each player runs on its own thread, turns are arbitrated with a lock and a condition variable, and all shared state is guarded so that two threads can never corrupt the board mid-move.
 
 The game itself is the domain; the real subject is **safe coordination of concurrent threads over shared mutable state** — the same problem that shows up in any backend that handles simultaneous requests.
 
@@ -24,19 +22,21 @@ The game itself is the domain; the real subject is **safe coordination of concur
 
 ```
 src/
-├── Main.java                  # Entry point: wires up the board, engine, controller, and player threads
-├── model/
-│   ├── Board.java             # Lock-guarded game state: pits, scores, move + capture logic
-│   ├── GameEngine.java        # Serializes move application behind a lock
-│   └── MoveResult.java        # Immutable result of a move (success, captured seeds, game-over)
-├── controller/
-│   └── GameController.java    # Turn arbitration via ReentrantLock + Condition
-├── player/
-│   ├── Player.java            # Abstract Runnable player (the run loop: wait → move → end turn)
-│   ├── HumanPlayer.java       # Reads moves from the console
-│   └── AIPlayer.java          # Parallel move evaluation over a thread pool
-└── util/
-    └── GameLogger.java        # Thread-safe, timestamped logging
+├── main/java/
+│   ├── Main.java                  # Entry point: wires up board, engine, controller, and player threads
+│   ├── model/
+│   │   ├── Board.java             # Lock-guarded game state: pits, scores, move + capture logic
+│   │   ├── GameEngine.java        # Serializes move application behind a lock
+│   │   └── MoveResult.java        # Immutable result of a move (success, captured seeds, game-over)
+│   ├── controller/
+│   │   └── GameController.java    # Turn arbitration via ReentrantLock + Condition
+│   ├── player/
+│   │   ├── Player.java            # Abstract Runnable player (run loop: wait → move → end turn)
+│   │   ├── HumanPlayer.java       # Reads moves from the console
+│   │   └── AIPlayer.java          # Parallel move evaluation over a thread pool
+│   └── util/
+│       └── GameLogger.java        # Thread-safe, timestamped logging
+└── test/java/                     # JUnit 5 suite: Board, GameEngine, GameController, AIPlayer
 ```
 
 The layering is deliberate: `model` knows nothing about threads beyond protecting its own state, `controller` owns turn coordination, and `player` owns the per-thread run loop. Concurrency concerns are concentrated where they belong rather than smeared across the codebase.
@@ -103,18 +103,21 @@ Pits `0–5` belong to Player 1 and pits `6–11` to Player 2; enter the pit num
 - If the **last** seed lands in a pit **on your own side** that then holds **2 or 4** seeds, those seeds are **captured** into your score.
 - The round ends when either side has no seeds left to play; remaining seeds are swept to their owner, and the higher score wins.
 
+> Note: this is a deliberately simplified rule set. Traditional Ayò uses *relay (multi-lap) sowing* and a different capture rule; see *Possible extensions* for bringing the engine closer to the traditional game.
+
 ---
 
 ## Possible extensions
 
 Natural next steps, roughly in order of value:
 
+- **Traditional relay sowing.** Add multi-lap sowing (scoop and continue when the last seed lands in an occupied pit) to move from the simplified rule set toward the traditional Ayò game.
 - **Deeper AI search.** Replace the greedy one-move heuristic with **minimax + alpha–beta pruning**, parallelised across the existing thread pool — a natural fit given moves are already evaluated on isolated snapshots.
-- **Unit tests.** Cover move validation, sowing wrap-around, and the capture rule (JUnit 5 is already wired into the Maven build), plus a concurrency test asserting turn order under `AI vs AI`.
+- **Deeper test coverage.** The suite already covers the deterministic core and the turn-arbitration layer; natural additions are property-based/randomised tests and a longer-running stress test that hammers the turn handoff across many rapid AI-vs-AI games.
 - **A non-console interface.** Expose the engine behind a small REST or WebSocket layer so games can be driven over the network — a clean way to reuse the thread-safe core.
 
 ---
 
 ## Tech
 
-Java · `java.util.concurrent` (`ReentrantLock`, `Condition`, `ExecutorService`, `Future`) · standard library only, no external dependencies.
+Java · `java.util.concurrent` (`ReentrantLock`, `Condition`, `ExecutorService`, `Future`) · JUnit 5 · Maven · standard library only, no runtime dependencies.
