@@ -5,7 +5,10 @@ import java.util.concurrent.locks.ReentrantLock;
 public class GameEngine {
 
     private final Board board;
-    private final ReentrantLock lock = new ReentrantLock(true);
+    // Serializes move application as a defensive invariant. Turn alternation via
+    // GameController's Condition already ensures single-mover access, so this lock
+    // is currently uncontended; it guards correctness if turn discipline is ever relaxed.
+    private final ReentrantLock lock = new ReentrantLock();
 
     public GameEngine(Board board) { this.board = board; }
 
